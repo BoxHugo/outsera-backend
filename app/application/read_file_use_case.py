@@ -2,8 +2,6 @@ from app.infra.file_module.file_utils import FileUtils
 from config import config
 from typing import List, Dict
 
-
-
 class ReadFileUseCase:
 
     @classmethod
@@ -24,7 +22,7 @@ class ReadFileUseCase:
         rows = file_module.read_csv(filename)
 
         log.info("Movendo arquivo para processados")
-        # file_module.move_file(filename)
+        file_module.move_file(filename)
 
         log.info("Leitura finalizada.")
         return rows

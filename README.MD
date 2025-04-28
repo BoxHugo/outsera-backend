@@ -10,11 +10,12 @@ No diretório */docs/challenge/* segue os insumos para o desafio.
 
 - Python 3.10.12;
 - fastapi 0.115.12;
-- sqlite;
+- sqlite 3.37.2;
+- pytest 8.3.5
 
 ## Premissas
 
-O projeto foi criado no ambiente ubuntu wsl2.
+O projeto foi criado no ambiente ubuntu wsl2. O arquivo que é consumido está no diretório */app/infra/bucket/input*, depois que o arquivo for consumido, será movido para a pasta */processed*
 
 ### Crie um arquivo .env (com o mesmo nome)
 
@@ -39,8 +40,19 @@ Na raiz do projeto:
 
 ## Execução local
 
+        python3 main.py
 
+## Tests
+
+        pytest
 
 ## Debugger
 
 No diretório */.vscode/launch.json* está pré-configurado o modo debugger para o vscode.
+
+## Postman
+
+cURL
+
+        curl --location '127.0.0.1:8080/v1/intervals' \
+        --header 'x-api-key: a1b2c3d4'
