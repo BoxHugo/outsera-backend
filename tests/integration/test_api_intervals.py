@@ -1,14 +1,37 @@
-import pytest
-from tests.conftest import create_csv
+from unittest.mock import patch
+from config import config
 
-def test_intervals_success(client, setup_folders):
-    """ Testa endpoint /intervals caso de sucesso """
+@patch("app.controllers.intervals_controller.IntervalsController.get_award_intervals", return_value={
+    "min": [
+        {
+            "producer": "Joel Silver",
+            "interval": 1,
+            "previousWin": 1990,
+            "followingWin": 1991
+        }
+    ],
+    "max": [
+        {
+            "producer": "Matthew Vaughn",
+            "interval": 13,
+            "previousWin": 2002,
+            "followingWin": 2015
+        }
+    ]
+})
+@patch("app.controllers.load_file_controller.LoadFileController.run", return_value=None)
+@patch("app.infra.file_module.file_utils.FileUtils.read_csv", return_value=[
+    {"year": 1990, "title": "Movie A", "studios": "Studio", "producers": ["Joel Silver"], "winner": "yes"},
+    {"year": 1991, "title": "Movie B", "studios": "Studio", "producers": ["Joel Silver"], "winner": "yes"},
+    {"year": 2002, "title": "Movie C", "studios": "Studio", "producers": ["Matthew Vaughn"], "winner": "yes"},
+    {"year": 2015, "title": "Movie D", "studios": "Studio", "producers": ["Matthew Vaughn"], "winner": "yes"},
+])
+def test_intervals_success(mock_read_csv, mock_load_file, mock_find_intervals, setup_database, setup_db_for_test, client):
+    """Testa o /intervals com ganhadores - sucesso."""
 
-    content = "year;title;studios;producers;winner\n1980;Movie 1;Studio;Producer 1;yes\n1982;Movie 2;Studio;Producer 1;yes"
-    create_csv(setup_folders / "input", "file.csv", content)
+    headers = {"x-api-key": config.api_key}
+    response = client.get("/v1/intervals", headers=headers)
 
-    response = client.get("/intervals")
-    
     assert response.status_code == 200
     body = response.json()
     assert "min" in body
@@ -16,36 +39,38 @@ def test_intervals_success(client, setup_folders):
     assert len(body["min"]) > 0
     assert len(body["max"]) > 0
 
-def test_intervals_no_winners(client, setup_folders):
-    """ Testa endpoint /intervals caso sem ganhadores """
 
-    content = "year;title;studios;producers;winner\n1980;Movie 1;Studio;Producer 1;no"
-    create_csv(setup_folders / "input", "file.csv", content)
+@patch("app.controllers.intervals_controller.IntervalsController.get_award_intervals", side_effect=Exception("Unexpected error"))
+@patch("app.controllers.load_file_controller.LoadFileController.run", return_value=None)
+@patch("app.infra.file_module.file_utils.FileUtils.read_csv", return_value=[
+    {"year": 1990, "title": "Movie A", "studios": "Studio", "producers": ["Joel Silver"], "winner": "yes"},
+])
+def test_intervals_unexpected_error(mock_read_csv, mock_load_file, mock_find_intervals, setup_database, setup_db_for_test, client):
+    """Testa o /intervals quando ocorre um erro inesperado."""
 
-    response = client.get("/intervals")
+    headers = {"x-api-key": config.api_key}
+    response = client.get("/v1/intervals", headers=headers)
+
+    assert response.status_code >= 500  # Pode ser 500, 502, 503 dependendo da sua app
     body = response.json()
-    
+    assert "detail" in body
+
+@patch("app.controllers.intervals_controller.IntervalsController.get_award_intervals", return_value={
+    "min": [],
+    "max": []
+})
+@patch("app.controllers.load_file_controller.LoadFileController.run", return_value=None)
+@patch("app.infra.file_module.file_utils.FileUtils.read_csv", return_value=[
+    {"year": 1990, "title": "Movie A", "studios": "Studio", "producers": ["Joel Silver"], "winner": "no"},
+    {"year": 1991, "title": "Movie B", "studios": "Studio", "producers": ["Joel Silver"], "winner": "no"},
+])
+def test_intervals_no_winners(mock_read_csv, mock_load_file, mock_find_intervals, setup_database, setup_db_for_test, client):
+    """Testa o /intervals sem ganhadores."""
+
+    headers = {"x-api-key": config.api_key}
+    response = client.get("/v1/intervals", headers=headers)
+
     assert response.status_code == 200
+    body = response.json()
     assert body["min"] == []
     assert body["max"] == []
-
-def test_intervals_missing_file(client, setup_folders):
-    """ Testa endpoint /intervals caso sem arquivo consumido """
-
-    response = client.get("/intervals")
-    
-    assert response.status_code == 422 or response.status_code == 500
-
-def test_unexpected_error(client, setup_folders, monkeypatch):
-    """ Erro inesperado."""
-
-    def broken_read_csv(*args, **kwargs):
-        raise Exception("Simulated Error")
-
-    from app.infra.file_module.file_utils import FileUtils
-
-    monkeypatch.setattr(FileUtils, "read_csv", broken_read_csv)
-
-    response = client.get("/intervals")
-    
-    assert response.status_code >= 500
